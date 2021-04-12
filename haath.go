@@ -8,7 +8,7 @@ import (
 	"path"
 )
 
-type History struct {
+type TakeoutHistory struct {
 	Favicon    string `json:"favicon_url"`
 	Transition string `json:"page_transition"`
 	Title      string `json:"title"`
@@ -18,41 +18,81 @@ type History struct {
 }
 
 type BrowserHistory struct {
-	Histories []History `json:"Browser History"`
+	Histories []TakeoutHistory `json:"Browser History"`
+}
+
+type ChromeAPIHistory struct {
+	Id                     string `json:"id"`
+	LastVisitTime          string `json:"lastVisitTime"`
+	LastVisitTimeTimestamp string `json:"lastVisitTimeTimestamp"`
+	Title                  string `json:"title"`
+	TypedCount             string `json:"typedCount"`
+	Url                    string `json:"url"`
+	VisitCount             string `json:"visitCount"`
+}
+
+type ChromeHistory struct {
+	Histories []ChromeAPIHistory
 }
 
 func main() {
-	fileFlag := flag.String("f", "", "Target file path")
+	// fileFlag := flag.String("f", "", "Target file path")
+	typeFlag := flag.String("t", "", "Target file type (e: Exported by extension, t: Exported by Google Takeout page)")
 	flag.Parse()
+	filename := flag.Arg(0)
 
-	if err := parseJson2Text(*fileFlag); err != nil {
+	if err := extractUrlFromJson(filename, *typeFlag); err != nil {
+		print(err)
 		os.Exit(0)
 	}
 
 }
 
-func parseJson2Text(filePath string) error {
+func extractUrlFromJson(filePath string, fileType string) error {
 	raw, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
 	}
 
-	var bhs BrowserHistory
-
-	json.Unmarshal(raw, &bhs)
-
-	var basename = path.Base(filePath)
-	file, err := os.Create(basename + ".txt")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	for _, history := range bhs.Histories {
-		_, err := file.WriteString(history.Url + "\n")
+	switch fileType {
+	case "e":
+		var chs []ChromeAPIHistory
+		json.Unmarshal(raw, &chs)
+		var basename = path.Base(filePath)
+		file, err := os.Create(basename + ".txt")
 		if err != nil {
 			return err
 		}
+		defer file.Close()
+
+		for _, history := range chs {
+			_, err := file.WriteString(history.Url + "\n")
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case "t":
+		var bhs BrowserHistory
+		json.Unmarshal(raw, &bhs)
+		var basename = path.Base(filePath)
+		file, err := os.Create(basename + ".txt")
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		for _, history := range bhs.Histories {
+			_, err := file.WriteString(history.Url + "\n")
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+
+	default:
+		print("Invalid option " + fileType)
+		return nil
 	}
-	return nil
 }
