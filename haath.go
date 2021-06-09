@@ -31,13 +31,41 @@ type ChromeAPIHistory struct {
 	VisitCount             string `json:"visitCount"`
 }
 
+type BingSearchPages struct {
+	Id               string `json:"id"`
+	Name             string `json:"name"`
+	Url              string `json:"url"`
+	IsFamilyFriendly bool   `json:"isFamilyFriendly"`
+	DisplayUrl       string `json:"displayUrl"`
+	Snippet          string `json:"snippet"`
+	DateLastCrawled  string `json:"dateLastCrawled"`
+	Language         string `json:"language"`
+	IsNavigational   bool   `json:"isNavigational"`
+}
+
+type BingSearchWebPages struct {
+	SearchUrl    string            `json:"webSearchUrl"`
+	TotalMatches int               `json:"totalEstimatedMatches"`
+	Value        []BingSearchPages `json:"value"`
+}
+
+type BingSearchQueryContext struct {
+	OriginalQuery string `json:"originalQuery"`
+}
+
+type BingSearchResponse struct {
+	Type         string                 `json:"_type"`
+	QueryContext BingSearchQueryContext `json:"queryContext"`
+	WebPages     BingSearchWebPages     `json:"webPages"`
+}
+
 type ChromeHistory struct {
 	Histories []ChromeAPIHistory
 }
 
 func main() {
 	// fileFlag := flag.String("f", "", "Target file path")
-	typeFlag := flag.String("t", "", "Target file type (e: Exported by extension, t: Exported by Google Takeout page)")
+	typeFlag := flag.String("t", "", "Target file type (e: Exported by extension, t: Exported by Google Takeout page b: Bing search API response)")
 	flag.Parse()
 	filename := flag.Arg(0)
 
@@ -85,6 +113,24 @@ func extractUrlFromJson(filePath string, fileType string) error {
 
 		for _, history := range bhs.Histories {
 			_, err := file.WriteString(history.Url + "\n")
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case "b":
+		var bsr BingSearchResponse
+		json.Unmarshal(raw, &bsr)
+		var basename = path.Base(filePath)
+		file, err := os.Create(basename + ".txt")
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		for _, page := range bsr.WebPages.Value {
+			_, err := file.WriteString(page.Url + "\n")
 			if err != nil {
 				return err
 			}
